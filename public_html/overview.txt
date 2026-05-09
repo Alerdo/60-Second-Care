@@ -1,0 +1,118 @@
+How data is collected
+Each page writes its data into PHP $_SESSION. Nothing is stored in a database until the very end.
+
+Page	Session key saved	Fields collected
+index.php	$_SESSION['profile']	sex, age (integer), conditions[]
+describe.php	$_SESSION['issue']	free-text description, body_area
+location.php	$_SESSION['location']	precise_location
+followup.php	$_SESSION['followup']	duration, severity, worsening, warning_symptoms[], conditional_* answers
+context.php	$_SESSION['context']	medical_history[], medication_status + text, allergy_status + text
+Each save function (e.g. save_profile_from_post() in session.php) reads from $_POST, strips tags, trims whitespace, validates against an allow-list, and only then writes to session. If validation fails, it sets a flash error and returns false — the page re-renders without moving forward.
+
+The conditional answers in followup are dynamic — extra fields appear based on body area (e.g. chest pain gets "radiating pain?", "sweating?"; back pain gets "bladder control?"). These are posted as conditional_* keys and stored as a sub-array inside $_SESSION['followup']['conditional'].
+
+What triggers the API call
+loading.php verifies all 5 session keys exist, then after a short JS animation it auto-submits a hidden form:
+
+
+// loading.php line 127-129
+window.setTimeout(function () {
+  document.getElementById('analysisSubmit').submit();
+}, 6000);
+That form POSTs to api/health-check.php.
+
+Inside health-check.php — two paths
+
+POST /api/health-check.php
+        │
+        ▼
+collect_health_check()   ← assembles all session data into one array
+        │
+        ▼
+check_red_flags($data)   ← instant rule-based check (no AI)
+    │           │
+  YES           NO
+    │           │
+    ▼           ▼
+Emergency    call Gemini API
+result       with full prompt
+Red flag check (redflags.php) runs first — before the API is ever called. It checks combinations like "chest pain + radiating to arm", "sudden severe headache", "confusion + weakness" etc. If triggered, it immediately returns urgencyLevel: emergency with no AI involved at all.
+
+The exact prompt sent to Gemini
+Built by two functions in gemini.php:
+
+System prompt (fixed, every call):
+
+
+You are a cautious health guidance assistant. You do not diagnose. You do not claim certainty.
+You provide general health guidance based only on user-provided symptoms. You must recommend
+urgent or emergency care when red-flag symptoms are present. Use simple, calm and practical
+language. Do not recommend prescription medication. Do not tell the user to ignore symptoms.
+Return only valid JSON matching the requested schema.
+User prompt (assembled from session data, example):
+
+
+Analyze this user health-check information and return structured guidance.
+
+User profile:
+- Sex: Male
+- Age: 34
+- Important conditions: None
+
+Symptom:
+- Description: Sharp pain when breathing in
+- Body area: Chest
+- Precise location: Upper chest, left side
+- Duration: 1-3 days
+- Severity: Moderate
+- Getting worse: Yes
+- Warning symptoms: Chest pain, Difficulty breathing
+
+Conditional answers:
+- Chest Pressure: Yes
+- Radiating Pain: No
+- Sudden Onset: Yes
+
+Medical context:
+- History: None
+- Medications: No
+- Allergies: No
+
+Return JSON only, matching this schema:
+{
+  "urgencyLevel": "self-care" | "doctor-soon" | "urgent" | "emergency",
+  "mostLikelyExplanation": "...",
+  "confidence": "low" | "medium" | "high",
+  "possibleCauses": ["..."],
+  "whatToDoNow": ["..."],
+  "whenToSeekHelp": ["..."],
+  "doctorQuestions": ["..."],
+  "doctorSummary": "...",
+  "disclaimer": "..."
+}
+How the API call is made
+In call_gemini() (gemini.php:51-63):
+
+
+// cURL POST to Google's API
+$endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b-it:generateContent?key=API_KEY';
+
+$payload = [
+  'systemInstruction' => ['parts' => [['text' => $systemPrompt]]],
+  'contents'          => [['role' => 'user', 'parts' => [['text' => $userPrompt]]]],
+  'generationConfig'  => [
+    'temperature'      => 0.2,          // low = consistent, less creative
+    'responseMimeType' => 'application/json',
+  ],
+];
+Model: gemma-3-27b-it (set in config.php)
+Timeout: 30 seconds
+Temperature 0.2: keeps outputs predictable and conservative
+Response handling
+The response text is extracted from candidates[0].content.parts[0].text, then:
+
+json_decode() — tries clean parse
+If that fails → extract_json_object() — scans for {...} block and tries again
+validate_ai_result() — checks all 9 required fields exist, sanitises strings, clamps list lengths
+If any step fails → fallback_result() — returns a safe generic "see a doctor" response
+The validated result is stored in $_SESSION['result'] and the user is redirected to result.ph
