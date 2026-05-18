@@ -26,12 +26,9 @@ $confColors = [
 $confColor = $confColors[$confidence] ?? $confColors['low'];
 $regionalViralNote = trim((string)($result['regionalViralNote'] ?? ''));
 $recommendedTests = array_values(array_filter(array_map('clean_text', $result['recommendedTests'] ?? [])));
-$recommendedTests = array_values(array_filter($recommendedTests, static function (string $test): bool {
-    $lower = strtolower($test);
-    return !str_contains($lower, 'blood test') && !str_contains($lower, 'blood testing');
-}));
 $recommendedTest = $recommendedTests[0] ?? null;
-$noTestPhrases = ['no specific', 'no home test', 'no test', 'not recommended', 'clinician assessment', 'clinical assessment'];
+$recommendedTestReason = trim((string)($result['recommendedTestReason'] ?? ''));
+$noTestPhrases = ['no specific', 'no home test', 'no test', 'not recommended'];
 $hasTests = $recommendedTest !== null
     && trim($recommendedTest) !== ''
     && !array_reduce($noTestPhrases, fn($carry, $p) => $carry || stripos($recommendedTest, $p) !== false, false);
@@ -69,6 +66,7 @@ $downloadText = implode("\n", $downloadLines);
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Result | 60 Second Care</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script>
     window.tailwind = window.tailwind || {};
     window.tailwind.config = { theme: { extend: { colors: { careBlue: '#3B82F6', carePale: '#E6F0FA' } } } };
@@ -149,6 +147,9 @@ $downloadText = implode("\n", $downloadLines);
       <section class="result-test-card">
         <div class="result-test-pill">Recommended Test</div>
         <h2 class="result-test-name"><?= h($recommendedTest) ?></h2>
+        <?php if ($recommendedTestReason !== ''): ?>
+        <p class="result-test-reason"><?= h($recommendedTestReason) ?></p>
+        <?php endif; ?>
         <a class="result-test-amazon" href="https://www.amazon.co.uk/s?k=<?= rawurlencode($recommendedTest) ?>" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="19" r="1.5" fill="currentColor"/><circle cx="17" cy="19" r="1.5" fill="currentColor"/><path d="M1 2h2l2.4 10.4a2 2 0 0 0 2 1.6H17a2 2 0 0 0 2-1.6L20.5 7H5.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Order this test Online

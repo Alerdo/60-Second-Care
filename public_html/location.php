@@ -94,6 +94,7 @@ function selected_area_icon(string $area): string
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Follow-up Questions | 60 Second Care</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script>
     window.tailwind = window.tailwind || {};
     window.tailwind.config = { theme: { extend: { colors: { careBlue: '#3B82F6', carePale: '#E6F0FA' } } } };
@@ -112,12 +113,6 @@ function selected_area_icon(string $area): string
           </svg>
         </a>
         <div class="screen3-brand"><span>60</span> Second Care</div>
-        <button class="screen3-bell" type="button" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M18 9.8c0-3.2-2.1-5.8-6-5.8s-6 2.6-6 5.8v3.3l-1.7 3.3h15.4L18 13.1V9.8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-            <path d="M9.7 19.2c.5 1 1.3 1.5 2.3 1.5s1.8-.5 2.3-1.5M12 2.4V4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </button>
       </header>
 
       <div class="screen3-progress">

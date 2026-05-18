@@ -25,13 +25,14 @@ $showProfile = $error !== null || isset($_GET['form']);
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>60 Second Care</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script>
     window.tailwind = window.tailwind || {};
     window.tailwind.config = { theme: { extend: { colors: { careBlue: '#3B82F6', carePale: '#E6F0FA' } } } };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="assets/style.css?v=desktop-4">
-  <script src="assets/app.js?v=dropdown-fields-1" defer></script>
+  <link rel="stylesheet" href="assets/style.css?v=location-search-1">
+  <script src="assets/app.js?v=location-search-1" defer></script>
 </head>
 <body class="min-h-screen bg-white text-slate-950 antialiased">
   <main class="min-h-screen">
@@ -87,7 +88,20 @@ $showProfile = $error !== null || isset($_GET['form']);
         </svg>
 
         <h1 class="splash-title"><span>60</span> Second Care</h1>
-        <p class="splash-subtitle">Start your 60 seconds health check</p>
+        <div class="splash-gemini-badge">
+          <svg class="splash-gemini-icon" viewBox="0 0 28 28" aria-hidden="true" fill="none">
+            <path d="M14 2C14 2 16.5 9.5 20 13C23.5 16.5 26 19 26 19C26 19 23.5 21.5 20 25C16.5 28.5 14 26 14 26C14 26 11.5 28.5 8 25C4.5 21.5 2 19 2 19C2 19 4.5 16.5 8 13C11.5 9.5 14 2 14 2Z" stroke="url(#gGrad)" stroke-width="1.6" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="gGrad" x1="2" y1="2" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#8B5CF6"/>
+                <stop offset="50%" stop-color="#3B82F6"/>
+                <stop offset="100%" stop-color="#06B6D4"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span>Powered by <strong>Google Gemini AI</strong></span>
+        </div>
+        <p class="splash-subtitle">Your health journey starts here</p>
 
         <button class="splash-start-button" type="button" data-start-health-check>
           Start 60 Seconds Health Check
@@ -157,12 +171,6 @@ $showProfile = $error !== null || isset($_GET['form']);
                 <span>Age</span>
               </legend>
               <input class="profile-age-input" type="number" name="age" min="0" max="120" required placeholder="Enter your age" value="<?= h($profile['age'] ?? '') ?>">
-              <div class="profile-age-ranges" aria-label="Quick age ranges">
-                <button type="button" data-age-fill="24">18-29</button>
-                <button type="button" data-age-fill="37">30-44</button>
-                <button type="button" data-age-fill="54">45-64</button>
-                <button type="button" data-age-fill="70">65+</button>
-              </div>
             </fieldset>
 
             <fieldset class="profile-form-section">
@@ -173,11 +181,19 @@ $showProfile = $error !== null || isset($_GET['form']);
                     <circle cx="12" cy="10" r="2.2" fill="none" stroke="currentColor" stroke-width="1.9"/>
                   </svg>
                 </span>
-                <span>Your Location</span>
+                <span>Your Location</span> 
               </legend>
-              <input class="profile-age-input" type="text" name="user_location" maxlength="100" placeholder="e.g. London, UK" value="<?= h($profile['user_location'] ?? '') ?>">
-              <p class="profile-field-hint">Location helps us check for viral infections currently active in the area.</p>
-            </fieldset>
+              
+              <div class="profile-location-search" data-location-search>
+                <input class="profile-age-input" type="search" name="user_location" maxlength="100" autocomplete="off" placeholder="Search city, town or area" value="<?= h($profile['user_location'] ?? '') ?>" data-location-input>
+                <input type="hidden" name="location_country" value="<?= h($profile['location']['country'] ?? '') ?>" data-location-country>
+                <button type="button" data-location-search-button>Search</button>
+                <div class="profile-location-results hidden" data-location-results></div>
+                <p class="profile-location-status" data-location-status aria-live="polite"></p>
+              </div>
+               <p class="profile-field-hint">Location helps us check for viral infections currently active in the area.</p>
+          
+               </fieldset>
 
 <fieldset class="profile-form-section">
   <legend>
@@ -190,7 +206,7 @@ $showProfile = $error !== null || isset($_GET['form']);
     <span>Important medical context</span>
   </legend>
   <div class="profile-select-wrapper">
-    <select class="profile-select" name="conditions[]">
+    <select class="profile-select" name="conditions[]" aria-label="Important medical context">
       <?php
         $conditionOptions = ['None', 'Diabetes', 'Asthma', 'Heart Condition', 'High Blood Pressure', 'Pregnant', 'Other'];
         $selectedCondition = !empty($conditions) ? $conditions[0] : 'None';
@@ -212,7 +228,7 @@ $showProfile = $error !== null || isset($_GET['form']);
     <span>Allergies</span>
   </legend>
   <div class="profile-select-wrapper">
-    <select class="profile-select" name="allergies[]" id="allergySelect">
+    <select class="profile-select" name="allergies[]" id="allergySelect" aria-label="Allergies">
       <?php
         $allergyOptions = ['None known', 'Penicillin', 'NSAIDs (ibuprofen, aspirin)', 'Aspirin', 'Paracetamol', 'Other'];
         $selectedAllergy = !empty($allergies) ? $allergies[0] : 'None known';

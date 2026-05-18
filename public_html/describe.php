@@ -25,6 +25,7 @@ $selectedOnset = $issue['onset'] ?? '';
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Describe Issue | 60 Second Care</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script>
     window.tailwind = window.tailwind || {};
     window.tailwind.config = { theme: { extend: { colors: { careBlue: '#3B82F6', carePale: '#E6F0FA' } } } };
@@ -64,12 +65,12 @@ $selectedOnset = $issue['onset'] ?? '';
               <path d="M12.5 22c2.1 1.5 4.9 1.5 7 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
             </svg>
           </div>
-          <div class="describe-bubble">Describe the pain or issue in 1-4 sentences.</div>
+          <div class="describe-bubble">Describe the pain or issue in 2-4 sentences.</div>
         </section>
 
         <label class="describe-textbox-wrap">
           <span class="sr-only">Describe the issue</span>
-          <textarea class="describe-textbox" name="description" rows="3" placeholder="I have a headache and pressure behind my eyes since this morning."><?= h($description) ?></textarea>
+          <textarea class="describe-textbox" name="description" rows="3" placeholder="Describe what you feel, where it is, when it started, and what makes it better or worse."><?= h($description) ?></textarea>
           <svg class="describe-pencil" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="m4 16.8-.7 3.9 3.9-.7L19.4 7.8a2.2 2.2 0 0 0 0-3.1l-.1-.1a2.2 2.2 0 0 0-3.1 0L4 16.8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
             <path d="m14.8 6 3.2 3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>

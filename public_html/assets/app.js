@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
   setupStartScreen();
+  setupLocationSearch();
+  setupAllergySelect();
   setupAgeRangeButtons();
   setupMedicationField();
   setupNoneCheckboxes();
@@ -17,22 +19,6 @@ document.addEventListener('DOMContentLoaded', function () {
   setupViewerSizeLabel();
 });
 
-  (function () {
-    var allergySelect = document.getElementById('allergySelect');
-    var allergyOtherField = document.getElementById('allergyOtherField');
-
-    if (allergySelect && allergyOtherField) {
-      allergySelect.addEventListener('change', function () {
-        if (this.value === 'Other') {
-          allergyOtherField.classList.remove('hidden');
-        } else {
-          allergyOtherField.classList.add('hidden');
-          allergyOtherField.value = '';
-        }
-      });
-    }
-  })();
-
 function setupViewerSizeLabel() {
   var label = document.getElementById('viewerSizeLabel');
   var wrap  = label && label.closest('.describe-body-image-wrap');
@@ -45,6 +31,129 @@ function setupViewerSizeLabel() {
   if (window.ResizeObserver) {
     new ResizeObserver(update).observe(wrap);
   }
+}
+
+function setupLocationSearch() {
+  var wrap = document.querySelector('[data-location-search]');
+  if (!wrap) return;
+
+  var input = wrap.querySelector('[data-location-input]');
+  var country = wrap.querySelector('[data-location-country]');
+  var button = wrap.querySelector('[data-location-search-button]');
+  var results = wrap.querySelector('[data-location-results]');
+  var status = wrap.querySelector('[data-location-status]');
+  var controller = null;
+  var searchTimer = null;
+  var lastQuery = '';
+
+  function setStatus(message) {
+    if (status) status.textContent = message || '';
+  }
+
+  function clearResults() {
+    if (results) {
+      results.innerHTML = '';
+      results.classList.add('hidden');
+    }
+  }
+
+  function placeLabel(place) {
+    var address = place.address || {};
+    var parts = [
+      address.city || address.town || address.village || address.hamlet || address.suburb || address.county,
+      address.state,
+      address.country
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : place.display_name;
+  }
+
+  async function searchLocations() {
+    var query = input ? input.value.trim() : '';
+    if (query.length < 3) {
+      clearResults();
+      setStatus(query.length ? 'Type at least 3 characters.' : '');
+      return;
+    }
+
+    if (query === lastQuery && results && !results.classList.contains('hidden')) {
+      return;
+    }
+    lastQuery = query;
+
+    if (controller) controller.abort();
+    controller = new AbortController();
+    clearResults();
+    setStatus('Searching locations...');
+
+    try {
+      var url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q=' + encodeURIComponent(query);
+      var response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+      if (!response.ok) throw new Error('location_search_failed');
+      var places = await response.json();
+      if (!Array.isArray(places) || !places.length) {
+        setStatus('No locations found. You can still type your location manually.');
+        return;
+      }
+
+      results.innerHTML = '';
+      places.forEach(function (place) {
+        var option = document.createElement('button');
+        option.type = 'button';
+        option.textContent = placeLabel(place);
+        option.addEventListener('click', function () {
+          input.value = option.textContent;
+          if (country) country.value = String((place.address && place.address.country_code) || '').toUpperCase();
+          clearResults();
+          setStatus('Location selected.');
+        });
+        results.appendChild(option);
+      });
+      results.classList.remove('hidden');
+      setStatus('Choose the closest match.');
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      setStatus('Location search is unavailable. You can still type your location manually.');
+    }
+  }
+
+  function scheduleSearch() {
+    window.clearTimeout(searchTimer);
+    var query = input ? input.value.trim() : '';
+    if (country) country.value = '';
+    clearResults();
+    if (query.length < 3) {
+      setStatus(query.length ? 'Type at least 3 characters.' : '');
+      return;
+    }
+    setStatus('Searching shortly...');
+    searchTimer = window.setTimeout(searchLocations, 650);
+  }
+
+  if (button) button.addEventListener('click', searchLocations);
+  if (input) {
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        searchLocations();
+      }
+    });
+    input.addEventListener('input', scheduleSearch);
+  }
+}
+
+function setupAllergySelect() {
+  var allergySelect = document.getElementById('allergySelect');
+  var allergyOtherField = document.getElementById('allergyOtherField');
+  if (!allergySelect || !allergyOtherField) return;
+
+  function update() {
+    var isOther = allergySelect.value === 'Other';
+    allergyOtherField.classList.toggle('hidden', !isOther);
+    if (!isOther) allergyOtherField.value = '';
+  }
+
+  allergySelect.addEventListener('change', update);
+  update();
 }
 
 function setupStartScreen() {
@@ -90,7 +199,7 @@ function setupMedicationField() {
     if (details) {
       details.classList.toggle('hidden', !hasMedication);
       if (!hasMedication) {
-        details.querySelectorAll('input').forEach(function (field) {
+        details.querySelectorAll('input, select').forEach(function (field) {
           if (field.type === 'radio' || field.type === 'checkbox') {
             field.checked = false;
           } else {
@@ -189,9 +298,11 @@ function setupSeveritySlider() {
     value.textContent = slider.value;
     var percent = (Number(slider.value) / 10) * 100;
     slider.style.setProperty('--severity-fill', percent + '%');
+    slider.style.background = 'linear-gradient(90deg, #356BEA 0 ' + percent + '%, #E8EEF7 ' + percent + '% 100%)';
   }
 
   slider.addEventListener('input', update);
+  slider.addEventListener('change', update);
   update();
 }
 
@@ -259,7 +370,7 @@ function setupBodySelector() {
   }
 
   var areaZoom = {
-    'Head':        { target: '0m 168m 11m',   fov: 14 },
+    'Head':        { target: '0m 168m 11m',   fov: 4 },
     'Neck':        { target: '0m 153m 12m',   fov: 16 },
     'Chest':       { target: '0m 133m 12m',   fov: 18 },
     'Stomach':     { target: '0m 107m 12m',   fov: 18 },
@@ -270,7 +381,7 @@ function setupBodySelector() {
   };
 
   var REF_HEIGHT = 480;
-  var DEFAULT_BODY_FOV = 32.7;
+  var DEFAULT_BODY_FOV = 50;
   var DEFAULT_VISIBLE_H = 620;
 
   function scaledFov(baseFov) {
@@ -295,7 +406,7 @@ function setupBodySelector() {
       viewer.setAttribute('camera-target', zoom.target);
       viewer.setAttribute('field-of-view', scaledFov(zoom.fov));
     } else {
-      viewer.setAttribute('camera-target', '0m 148m 3m');
+      viewer.setAttribute('camera-target', '0m 170m 3m');
       viewer.setAttribute('field-of-view', defaultFov());
     }
   }

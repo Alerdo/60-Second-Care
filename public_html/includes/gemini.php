@@ -43,7 +43,7 @@ function call_gemini(string $systemPrompt, string $userPrompt): array
             ],
         ],
         'generationConfig' => [
-            'temperature' => 0.4,
+            'temperature' => 0.2,
             'responseMimeType' => 'application/json',
             'responseSchema' => [
                 'type' => 'OBJECT',
@@ -53,11 +53,11 @@ function call_gemini(string $systemPrompt, string $userPrompt): array
                     'confidence' => ['type' => 'STRING', 'enum' => ['low', 'medium', 'high']],
                     'possibleCauses' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                     'recommendedTests' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
+                    'recommendedTestReason' => ['type' => 'STRING'],
                     'whatToDoNow' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                     'whenToSeekHelp' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                     'doctorQuestions' => ['type' => 'ARRAY', 'items' => ['type' => 'STRING']],
                     'doctorSummary' => ['type' => 'STRING'],
-                    'disclaimer' => ['type' => 'STRING'],
                     'regionalViralNote' => ['type' => 'STRING'],
                 ],
                 'required' => [
@@ -66,11 +66,11 @@ function call_gemini(string $systemPrompt, string $userPrompt): array
                     'confidence',
                     'possibleCauses',
                     'recommendedTests',
+                    'recommendedTestReason',
                     'whatToDoNow',
                     'whenToSeekHelp',
                     'doctorQuestions',
                     'doctorSummary',
-                    'disclaimer',
                     'regionalViralNote',
                 ],
             ],
@@ -86,7 +86,7 @@ function call_gemini(string $systemPrompt, string $userPrompt): array
             'X-goog-api-key: ' . $apiKey,
         ],
         CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_TIMEOUT => 30,
+        CURLOPT_TIMEOUT => 45,
     ]);
 
     $response = curl_exec($ch);
@@ -164,7 +164,6 @@ function validate_ai_result($result, array $data): ?array
         'whenToSeekHelp',
         'doctorQuestions',
         'doctorSummary',
-        'disclaimer',
     ];
 
     foreach ($required as $key) {
@@ -185,15 +184,16 @@ function validate_ai_result($result, array $data): ?array
 
     return [
         'urgencyLevel' => $urgency,
-        'mostLikelyExplanation' => clean_multiline($result['mostLikelyExplanation'], 2400),
+        'mostLikelyExplanation' => clean_multiline($result['mostLikelyExplanation'], 1200),
         'confidence' => $confidence,
-        'possibleCauses' => normalize_result_list($result['possibleCauses'], 7),
-        'recommendedTests' => normalize_result_list($result['recommendedTests'], 3),
-        'whatToDoNow' => normalize_result_list($result['whatToDoNow'], 8),
-        'whenToSeekHelp' => normalize_result_list($result['whenToSeekHelp'], 8),
-        'doctorQuestions' => normalize_result_list($result['doctorQuestions'], 6),
-        'doctorSummary' => clean_multiline($result['doctorSummary'] ?: doctor_summary($data), 2500),
-        'disclaimer' => clean_multiline($result['disclaimer'] ?: CARE_DISCLAIMER, 500),
+        'possibleCauses' => normalize_result_list($result['possibleCauses'], 5),
+        'recommendedTests' => normalize_result_list($result['recommendedTests'], 1),
+        'recommendedTestReason' => clean_multiline($result['recommendedTestReason'] ?? '', 400),
+        'whatToDoNow' => normalize_result_list($result['whatToDoNow'], 5),
+        'whenToSeekHelp' => normalize_result_list($result['whenToSeekHelp'], 5),
+        'doctorQuestions' => normalize_result_list($result['doctorQuestions'], 4),
+        'doctorSummary' => clean_multiline($result['doctorSummary'] ?: doctor_summary($data), 1800),
+        'disclaimer' => CARE_DISCLAIMER,
         'regionalViralNote' => clean_multiline($result['regionalViralNote'] ?? '', 600),
         'redFlagTriggered' => false,
     ];
@@ -251,7 +251,7 @@ function fallback_result(array $data): array
 
 function build_system_prompt(): string
 {
-    return 'You are a careful, clinically-informed health guidance assistant. You do not diagnose, do not claim certainty, and do not replace a doctor. Your role is to assess user-provided symptoms, identify possible explanations, estimate urgency, and give practical next steps.
+    return 'You are a careful health guidance assistant. You do not diagnose, do not claim certainty, and do not replace a doctor. Your role is to assess user-provided symptoms, identify possible explanations, estimate urgency, and give practical next steps.
 
 Use all provided details, including age, sex, symptom location, duration, severity, worsening pattern, warning symptoms, medical history, medications, allergies, and conditional answers. Prioritize safety: if symptoms suggest a red flag or possible serious condition, recommend urgent or emergency care clearly.
 
@@ -264,9 +264,11 @@ Do not exaggerate certainty. Do not provide a definitive diagnosis. Do not recom
 
 For regionalViralNote: if the user provided a location, use your knowledge of typical seasonal and regional disease patterns to assess whether any currently common illnesses in that area (flu, COVID variants, RSV, norovirus, scarlet fever, strep, or other locally prevalent infections) are consistent with the reported symptoms. Write one concise sentence naming the illness and why it fits — for example: "Flu is currently widespread in London and matches your fever, body aches, and fatigue." If the symptoms do not match any regional illness, or no location was provided, return an empty string.
 
-For recommendedTests, return at most ONE item: a specific home-purchasable test or measurement tool that genuinely fits the complaint. Choose based on the symptoms and context, for example "COVID test kit" for viral respiratory symptoms, "urine dip test strips" for urinary symptoms, "pregnancy test" where pregnancy is plausible, "blood pressure monitor" for relevant headache/dizziness patterns, "thermometer" for fever monitoring, or "peak flow meter" for asthma/breathing symptoms. Do not default to blood tests. Do not return broad phrases like "blood test", "home blood test kit", "visual assessment", "see a doctor", or "clinician examination". If no suitable home test exists or the symptom mainly needs examination, return an empty array and explain the need for clinical review in whenToSeekHelp.
+For recommendedTests, return at most ONE item — the single most useful home test, home monitoring tool, or online-orderable test given your ANALYSIS CONCLUSION, not just the raw symptoms. Base this on what you concluded, not on what the user described. If your conclusion points to a specific condition, recommend a specific option for that condition: for example "Thyroid TSH Test" for suspected hypothyroidism, "Ferritin Test" for suspected iron-deficiency anaemia, "HbA1c inger-prick Test" for suspected diabetes, or " Urine Dipstick Test" for suspected UTI. For vague or multi-cause presentations where no condition can be concluded, a home monitoring tool is appropriate: "COVID lateral flow test" for viral respiratory illness, "Thermometer" for general fever monitoring, "Blood Pressure Monitor" for unexplained dizziness or headaches, "Peak Flow Meter" for breathing issues, "Pregnancy Test" where pregnancy is plausible. Do not return generic phrases like "blood test" or "see a doctor" — always be specific. If no home or online-orderable at-home option genuinely adds value, return an empty array.
 
-Write in full sentences throughout. Prioritise completeness over brevity — each field should be as detailed and informative as the symptom picture allows. For mostLikelyExplanation, aim for a thorough paragraph (3-5 sentences) explaining the reasoning. For each list item in whatToDoNow and whenToSeekHelp, write a complete, actionable sentence rather than a short phrase. For doctorSummary, write a clear multi-sentence summary a doctor could read to understand the case.
+For recommendedTestReason, write 2 sentences: what the test measures or detects, then what an abnormal result reveals and how it helps confirm or rule out your concluded diagnosis. Example: "An Thyroid TSH Test measures thyroid-stimulating hormone levels. An abnormal result would support or argue against hypothyroidism and help decide whether medical follow-up is needed." If recommendedTests is empty, return an empty string.
+
+Keep the result concise. For mostLikelyExplanation, use 2-3 clear sentences. For lists, return only the most useful items and keep each item to one short actionable sentence. For doctorSummary, write a compact paragraph a doctor could scan quickly.
 
 Return only valid JSON matching the requested schema. Do not include markdown, explanations outside JSON, or extra keys.';
 }
@@ -331,12 +333,12 @@ Return JSON only, matching this schema:
   "mostLikelyExplanation": "...",
   "confidence": "low" | "medium" | "high",
   "possibleCauses": ["..."],
-  "recommendedTests": ["At most one home-purchasable test kit name, short and specific. Empty array if no home test is appropriate."],
+  "recommendedTests": ["One specific home test, home monitoring tool, or online-orderable  test based on your ANALYSIS CONCLUSION. Empty array if no home option adds value."],
+  "recommendedTestReason": "2 sentences: what the test measures, then how an abnormal result confirms or rules out your concluded diagnosis. Empty string if no test.",
   "whatToDoNow": ["Practical things the user can do at home right now - rest, diet, self-care, monitoring. Do not include see a doctor or seek medical advice here; those belong in whenToSeekHelp."],
   "whenToSeekHelp": ["..."],
   "doctorQuestions": ["..."],
   "doctorSummary": "...",
-  "disclaimer": "...",
   "regionalViralNote": "One sentence about a regional viral illness matching symptoms, or empty string."
 }';
 }

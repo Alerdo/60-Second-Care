@@ -42,6 +42,7 @@ if ($quality !== '' && $quality !== 'None') {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Analysing | 60 Second Care</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script>
     window.tailwind = window.tailwind || {};
     window.tailwind.config = { theme: { extend: { colors: { careBlue: '#3B82F6', carePale: '#E6F0FA' } } } };
@@ -153,10 +154,11 @@ if ($quality !== '' && $quality !== 'None') {
     document.getElementById('analysisSubmit').submit();
 
     var analysisRows = Array.from(document.querySelectorAll('[data-analysis-row]'));
+    var rowDelays = [800, 1200, 1200, 1400, 900, 2000, 1200];
     function tickRow(index) {
       if (index >= analysisRows.length) return;
       var row = analysisRows[index];
-      var delay = row.hasAttribute('data-instant') ? 80 : 700;
+      var delay = row.hasAttribute('data-instant') ? 80 : (rowDelays[index] || 1200);
       window.setTimeout(function () {
         row.classList.add('is-complete');
         row.classList.remove('is-active');

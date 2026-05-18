@@ -148,6 +148,11 @@ function pregnancy_applies(string $sex, int $age): bool
 
 function normalize_country_code(string $location): string
 {
+    $code = strtoupper(trim($location));
+    if (preg_match('/^[A-Z]{2}$/', $code)) {
+        return $code;
+    }
+
     $lower = strtolower($location);
     if (str_contains($lower, 'united states') || preg_match('/\b(u\.s\.a?|usa)\b/', $lower)) {
         return 'US';
@@ -316,6 +321,7 @@ function save_profile_from_post(): bool
     ]);
     $conditions = none_clears(post_array('conditions'));
     $userLocation = clean_text($_POST['user_location'] ?? '', 100);
+    $locationCountry = clean_text($_POST['location_country'] ?? '', 2);
     $allergies = none_clears(post_array('allergies'), 'None known');
     $allergyOther = clean_text($_POST['allergy_other'] ?? '', 100);
     $pregnancyStatus = clean_text($_POST['pregnancy_status'] ?? '', 30);
@@ -348,7 +354,7 @@ function save_profile_from_post(): bool
         $pregnancyStatus = 'not_applicable';
     }
 
-    $country = normalize_country_code($userLocation);
+    $country = $locationCountry !== '' ? normalize_country_code($locationCountry) : normalize_country_code($userLocation);
 
     $_SESSION['profile'] = [
         'sex' => $sex,
@@ -702,6 +708,7 @@ function page_start(string $title, int $step): void
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= h($title) ?> | 60 Second Care</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <script>
     window.tailwind = window.tailwind || {};
     window.tailwind.config = { theme: { extend: { colors: { careBlue: '#3B82F6', carePale: '#E6F0FA' } } } };
