@@ -1,6 +1,6 @@
 # 🩺 60 Second Care
 
-**A first layer of healthcare — built for a Google hackathon competition hosted on Kaggle.**
+**A first layer of healthcare — built for The Gemma 4 Good Hackathon, a Kaggle-hosted competition sponsored by Google LLC and associated with Google DeepMind.**
 
 60 Second Care is an MVP health-check web application designed around one simple idea:
 
