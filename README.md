@@ -523,10 +523,10 @@ Users should contact emergency services or a qualified healthcare professional w
 
 ## Conclusion
 
-60 Second Care was created from a real frustration with healthcare access and a belief that technology can improve the first step of care.
+**60 Second Care** was created from a **real frustration with healthcare access** and a belief that **technology can improve the first step of care**.
 
-It is not a doctor. It is not a diagnosis engine. It is a first layer.
+It is **not a doctor**. It is **not a diagnosis engine**. It is a **first layer**.
 
-It helps people pause, describe what is happening, collect better information, check for danger signs, and take action.
+It helps people **pause**, **describe what is happening**, **collect better information**, **check for danger signs**, and **take action**.
 
-That is what accessible healthcare should feel like: fast, clear, careful, and available to everyone.
+That is what **accessible healthcare** should feel like: **fast**, **clear**, **careful**, and **available to everyone**.
