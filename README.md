@@ -113,212 +113,420 @@ flowchart LR
 
 ---
 
-# Original README Content
-
-The following section keeps the original project explanation and story as provided.
-
-🩺60 Second Care: A First Layer of Healthcare
-💡 Inspiration
+## Inspiration
 
 I built 60 Second Care because I am genuinely passionate about healthcare and how technology can make it more accessible, faster, and easier to understand.
 
-The idea came from my own experience struggling with healthcare in the UK, especially for simple issues. Sometimes you have a symptom that feels worrying, but you are not sure whether it needs a doctor, urgent care, self-care, or just better monitoring. Getting an appointment can take time, online searches can be confusing, and people often do not know what information is actually useful before speaking to a clinician.
+The idea came from my own experience struggling with healthcare access in the UK, especially for simple issues. Sometimes a symptom feels worrying, but it is not clear whether it needs a doctor, urgent care, self-care, monitoring, or better information first.
 
-That gap inspired me to build a tool that helps people collect the right information quickly and turn it into practical next steps.
-Project Overview
+Getting an appointment can take time, online searches can be confusing, and people often do not know what information is useful before speaking to a clinician.
+
+That gap inspired this project: a tool that helps people collect the right information quickly and turn it into practical next steps.
+
+## Project Overview
 
 60 Second Care is an MVP healthcare guidance application that helps users complete a short health check in around one minute.
 
-The project does not try to replace doctors or diagnose users. Instead, it acts as a first layer of healthcare: a guided, structured step before a user decides what to do next.
-
-The app asks the user for:
-
-basic health context
-symptoms
-body location
-severity
-duration
-medication use
-warning signs
-medical history
-It then uses a combination of rule-based safety checks and AI analysis to produce clear guidance.
+It does **not** try to replace doctors or diagnose users. Instead, it acts as a first layer of healthcare: a guided, structured step before a user decides what to do next.
 
 The final result gives the user:
 
-🚨 an urgency level
-🧠 a possible explanation
-📊 confidence level
-⚠️ possible causes
-✅ what they can do now
-📞 when to seek help
-📝 a doctor summary
-🧪 and, where useful, a recommended home or online-orderable test
-🧍 The Role Of The 3D Body Model
+- 🚨 an urgency level
+- 🧠 a possible explanation
+- 📊 confidence level
+- ⚠️ possible causes
+- ✅ what they can do now
+- 📞 when to seek help
+- 📝 a doctor summary
+- 🧪 where useful, a recommended home or online-orderable test
+
+## Technical Stack
+
+The MVP is built as a traditional PHP multi-page web application designed for a local XAMPP / Apache environment.
+
+- **Backend:** PHP
+- **Database:** MySQL with PDO
+- **Frontend:** JavaScript, Tailwind CSS, custom CSS
+- **AI:** Google Gemini / Gemma through the Google Generative Language API
+- **3D interaction:** `<model-viewer>` with a GLB body model
+- **Session state:** PHP sessions
+- **Storage model:** anonymous database save only after consent
+
+## Project Structure
+
+```text
+public_html/
+├── index.php                 # Landing and profile onboarding
+├── describe.php              # Symptom description and 3D body selection
+├── location.php              # Follow-up questions, severity, medication, context
+├── loading.php               # Loading screen that submits to backend analysis
+├── result.php                # Final guidance, doctor summary, feedback actions
+├── schema.sql                # Database schema
+│
+├── api/
+│   ├── health-check.php      # Main health-check endpoint
+│   └── feedback.php          # Feedback save endpoint
+│
+├── includes/
+│   ├── session.php           # Session handling, input normalization, payload builder
+│   ├── redflags.php          # Rule-based emergency / red-flag checks
+│   ├── gemini.php            # Gemini prompt building, API call, JSON validation
+│   └── db.php                # PDO connection and consented database storage
+│
+└── assets/
+    ├── app.js                # Frontend interactions, 3D body picker, forms, feedback
+    ├── style.css             # Custom styling
+    └── 3d/male_body.glb      # MVP 3D body model
+```
+
+## Application Flow
+
+```text
+index.php
+   ↓
+describe.php
+   ↓
+location.php
+   ↓
+loading.php
+   ↓
+api/health-check.php
+   ↓
+result.php
+```
+
+The user journey is split into focused steps so the application can collect structured context instead of depending on a single vague symptom paragraph.
+
+1. **Landing and profile context**  
+   `index.php` collects basic profile details such as age, sex, location, conditions, and allergies.
+
+2. **Symptom description and body area**  
+   `describe.php` collects the main symptom description, pain quality, onset, and selected body area through the 3D model.
+
+3. **Follow-up details**  
+   `location.php` collects duration, severity, medication use, associated symptoms, warning signs, and extra context.
+
+4. **Safety and AI processing**  
+   `loading.php` sends the structured session data to `api/health-check.php`.
+
+5. **Result and action**  
+   `result.php` displays urgency, possible causes, next steps, doctor summary, and a useful test when appropriate.
+
+## System Architecture
+
+```text
+[User Browser]
+      |
+      v
+[PHP Screens]
+index.php → describe.php → location.php → loading.php
+      |
+      v
+[PHP Session State]
+profile + issue + body area + follow-up + context
+      |
+      v
+[api/health-check.php]
+      |
+      +--> [includes/redflags.php]
+      |        |
+      |        +--> emergency_result() if red flags are matched
+      |
+      +--> [includes/gemini.php]
+      |        |
+      |        +--> Google Gemini / Gemma structured JSON response
+      |
+      +--> validate_ai_result()
+      |
+      +--> optional save_consent_and_session()
+      |
+      v
+[result.php]
+```
+
+## Backend Architecture
+
+The backend uses PHP sessions to carry the health check across multiple screens. Each step saves only its own part of the form, then the final endpoint combines everything into a structured payload.
+
+Important session areas include:
+
+- `profile` — age, sex, location, medical history, allergies
+- `issue` — symptom description, body area, pain quality, onset
+- `followup` — duration, severity, warning symptoms, associated symptoms
+- `context` — medication use and additional context
+- `result` — final health guidance shown to the user
+- `anonymous_session_id` — random anonymous session identifier
+
+The final backend endpoint, `api/health-check.php`, follows this order:
+
+```text
+Collect session data
+     ↓
+Build structured health payload
+     ↓
+Run rule-based red-flag checks
+     ↓
+If emergency risk exists: return emergency guidance without AI
+     ↓
+If no emergency red flags: call Gemini / Gemma
+     ↓
+Validate and sanitize AI JSON
+     ↓
+Use fallback result if AI fails
+     ↓
+Save anonymous summary only if user gave consent
+     ↓
+Redirect to result page
+```
+
+This design keeps safety-critical decisions separate from AI-generated guidance.
+
+## Rule-Based Red-Flag Safety Layer
+
+Before Gemini is called, the app checks for urgent warning signs using deterministic PHP rules.
+
+Examples of red-flag categories include:
+
+- chest pain with breathing difficulty, sweating, or radiating pain
+- sudden severe headache
+- weakness, numbness, speech difficulty, confusion, or vision loss
+- fainting or collapse
+- severe bleeding
+- breathing or swallowing problems with swelling
+- back pain with bladder or bowel loss
+- pregnancy with severe abdominal pain
+- severe abdominal pain with blood in vomit or stool
+
+If a red flag is detected, the app does **not** continue to normal AI guidance. It returns an emergency-focused result from the rule engine.
+
+```text
+collect_health_check()
+      ↓
+check_red_flags()
+      ↓
+Emergency risk?
+      ├── Yes → emergency_result() → result.php
+      └── No  → Gemini structured analysis
+```
+
+## Gemini / Gemma AI Integration
+
+Gemini is used only after rule-based safety checks pass.
+
+The AI integration is handled in `includes/gemini.php`, which is responsible for:
+
+- building the system prompt
+- building the user prompt from structured session data
+- calling the Google Generative Language API
+- requesting JSON output
+- enforcing a response schema
+- parsing the returned response
+- validating the final result
+- falling back safely if the model fails
+
+The app does not send Gemini a loose paragraph alone. It sends a structured health payload containing profile context, selected body area, symptom details, severity, duration, medication use, allergies, medical history, associated symptoms, and red-flag answers.
+
+The expected AI response includes fields such as:
+
+- `urgencyLevel`
+- `mostLikelyExplanation`
+- `confidence`
+- `possibleCauses`
+- `recommendedTests`
+- `recommendedTestReason`
+- `whatToDoNow`
+- `whenToSeekHelp`
+- `doctorQuestions`
+- `doctorSummary`
+- `regionalViralNote`
+
+The output is validated before it is shown to the user. If the API fails, returns invalid JSON, or misses required fields, the app uses a conservative fallback result instead of exposing unreliable raw output.
+
+```text
+Gemini response
+      ↓
+JSON parse
+      ↓
+Required fields check
+      ↓
+Urgency / confidence normalization
+      ↓
+Text and list cleanup
+      ↓
+Valid result or safe fallback
+```
+
+## Why The 3D Body Model Matters
 
 One of the most important parts of the project is the interactive 3D body model.
 
-A common problem in healthcare is that people describe symptoms in vague ways. They might say “pain here” or “near my side,” but that is difficult for a system to interpret. The 3D model helps convert that vague feeling into structured information.
+A common problem in healthcare is that people describe symptoms vaguely. They might say “pain here” or “near my side,” but that can be difficult for a system to interpret.
 
-The user can select a body area such as:
+The 3D body model helps convert that vague feeling into a structured body-area signal.
 
-head
-neck
-chest
-stomach
-arm
-l- eg
-upper back
-lower back
-This selected body area then affects the rest of the health check. For example, chest symptoms trigger different follow-up questions than stomach symptoms or head symptoms. This makes the app more focused and more useful.
+The MVP lets users select areas such as:
 
-The 3D model is currently part of the MVP, but the long-term goal is to make it much more precise, with better anatomical mapping and more accurate body-region selection.
+- head
+- neck
+- chest
+- stomach
+- arm
+- leg
+- upper back
+- lower back
 
-⚙️How The System Works
+That selected area changes what the app asks next. For example, chest symptoms trigger different safety follow-ups than head, stomach, or leg symptoms.
 
-The project is built as a PHP web application with JavaScript, MySQL, and Google Gemini AI.
+Technically, this is useful because the selected `body_area` influences:
 
-The architecture has several layers:
+- associated symptom options
+- conditional red-flag questions
+- the structured payload sent to Gemini
+- the relevance of the final guidance
 
-1️⃣ User input layer
+Current MVP limitation: the model uses coarse body regions and a single static body model. Future versions should include more precise anatomical mapping, side-specific selection, and improved accessibility.
 
-The user enters profile details, symptoms, medical context, and body location.
+## Database and Consent-Based Storage
 
-2️⃣ 3D body selection layer
+The app is session-only by default. Anonymous data is saved to MySQL only when the user gives consent.
 
-The model helps collect structured body-area information.
+The database contains three main tables:
 
-3️⃣ Session data layer
+- `health_check_sessions` — anonymous health-check summary
+- `health_check_feedback` — user feedback linked to an anonymous session
+- `consent_records` — consent event tracking
 
-The app stores answers temporarily in PHP sessions while the user moves through the flow.
+The stored session summary can include fields such as:
 
-4️⃣ Rule-based red-flag layer
+- age range
+- sex
+- selected body area
+- symptom duration
+- severity
+- whether a red flag was triggered
+- urgency level
+- confidence
+- model identifier
+- app version
 
-Before AI is used, the app checks for urgent warning signs such as chest pain with breathing trouble, sudden severe headache, fainting, confusion, or severe bleeding.
+This is useful for improving the product while avoiding a user-account-based design. However, future versions should strengthen privacy by reducing location precision, redacting free text, adding retention controls, and considering encryption for sensitive stored fields.
 
-5️⃣ AI analysis layer
+## Value Proof: How The Implementation Supports The Vision
 
-If no emergency red flags are detected, the structured information is sent to Gemini to generate safe, practical guidance.
+### Accurate Input
 
-6️⃣ Action layer
+The codebase supports better input through:
 
-The result page gives users next steps and may recommend a specific test or monitoring tool.
+- structured multi-step forms
+- 3D body-area selection
+- severity scoring
+- duration and onset collection
+- medication and allergy context
+- medical history fields
+- associated symptom selection
+- warning-sign questions
 
-This layered design is important because healthcare apps must be cautious. AI is helpful, but emergency safety rules should come first.
+This creates more reliable context than a single free-text symptom box.
 
-🤖Gemini / Gemma AI Integration
+### Better Result
 
-The Gemini/Gemma integration was designed to be structured, controlled, and safety-focused. In a healthcare context, I did not want to send the model a loose paragraph and rely on an open-ended response. Instead, the app collects the user’s information step by step and converts it into a structured health payload before calling the model.
+The result is improved through:
 
-The prompt is split into two parts:
+- deterministic red-flag checks before AI
+- a structured health payload
+- controlled Gemini system and user prompts
+- JSON response schema enforcement
+- server-side validation and sanitization
+- conservative fallback behavior
+- a doctor-facing summary
 
-🛡️ a system prompt, which defines the model’s role, safety boundaries, tone, and output rules
-📥 a user prompt, which contains the actual health-check data collected from the user
+The AI is used as a guided analysis layer, not as an uncontrolled chatbot.
 
-The system prompt tells the model:
+### Prove It at Home
 
--not to diagnose
--not to claim certainty
--not to replace a clinician
--to prioritise urgent or emergency guidance when risk is present
+The app supports action by recommending one useful test or monitoring tool when appropriate.
 
-It also requires the model to return only valid JSON in a fixed schema. This makes the response easier to validate, display, and safely control inside the application.
+This helps the user move from uncertainty to evidence-gathering. The goal is not to diagnose at home, but to help the user collect useful information before deciding whether to self-care, monitor, contact a doctor, or seek urgent help.
 
-The user prompt is built from structured session data, including:
+```text
+Structured symptom input
+        ↓
+Safer urgency guidance
+        ↓
+Recommended next step
+        ↓
+Useful test or monitoring tool
+        ↓
+More informed action
+```
 
-age
-sex
-location
-selected body area
-symptom description
-onset
-severity
-duration
-medication use
-allergies
-medical history
-associated symptoms
-red-flag answers
+## Result Page Output
 
-This helps the model reason from consistent inputs instead of vague free text.
+The result page is designed to be practical rather than only informational.
 
-The Gemini API call is implemented in a dedicated backend module. The application builds the prompts, sends them to the Google Generative AI endpoint, and requests a JSON response containing fields such as:
+It can show:
 
-urgency level
-likely explanation
-confidence
-possible causes
-recommended test
-next steps
-when to seek help
-doctor questions
-doctor summary
+- urgency level
+- likely explanation
+- confidence level
+- possible causes
+- what to do now
+- when to seek help
+- recommended tests
+- reason for the suggested test
+- questions to ask a doctor
+- doctor summary
+- feedback actions
+- download / copy options
 
-Before the result is shown to the user, the response is validated. If the model returns invalid JSON, misses required fields, or the API fails, the app falls back to a safer default result. This prevents raw or unreliable model output from being shown directly.
+This makes the result more useful for both the user and a clinician.
 
-In the current MVP, Gemini is mainly used at the final analysis stage. In an improved version, the system would make many more API calls throughout the journey. For example, Gemini could dynamically generate follow-up questions based on the user’s previous answers, selected body area, symptom severity, and medical context.
+## Current MVP Limitations
 
-This would allow the health check to become more personalised and adaptive, while still keeping strict validation and red-flag rules around every step.
+60 Second Care is a proof-of-concept MVP. Important limitations remain:
 
-This structured approach matters because healthcare AI needs reliability. By controlling the prompt, enforcing JSON output, validating the response, and combining AI with rule-based safety checks, the app makes Gemini useful as a guided decision-support layer rather than an uncontrolled chatbot.
+- no clinical validation study has been completed
+- red-flag rules need review against clinical triage standards
+- the 3D body model is coarse and not anatomically precise
+- the body model is not yet personalized by sex, age, or body type
+- AI output depends on user-provided information
+- stored free text may contain sensitive details if the user consents to storage
+- there is no full retention or deletion workflow yet
+- `regionalViralNote` currently depends too much on model reasoning instead of live public-health data
+- the app should not be used as a diagnosis system
 
-🧪 Helping Users Take Action Through Tests
+## Future Improvements
 
-A major part of 60 Second Care is helping users take action, not just giving them information.
+Planned or recommended improvements include:
 
-When useful, the app recommends one specific test or tool that could help the user collect better evidence. For example:
+- more accurate 3D anatomical selection
+- side-specific body mapping
+- clinician-reviewed red-flag rules
+- clinical validation of urgency recommendations
+- test-provider and pharmacy integration
+- stronger privacy controls and data minimization
+- data retention and deletion workflows
+- encrypted storage for sensitive fields
+- multilingual support
+- accessibility improvements
+- personalized follow-up after test results
+- automated tests and CI checks for AI prompt / response handling
+- live epidemiology feeds from public-health APIs for `regionalViralNote` instead of relying on the model alone
 
-COVID lateral flow test
-thermometer
-blood pressure monitor
-urine dipstick test
-pregnancy test
-peak flow meter
-thyroid TSH test
-ferritin test
-HbA1c finger-prick test
+## Safety Notice
 
-The idea is that users can run a test, collect real data, and then make a better decision about what to do next.
+60 Second Care is not a diagnostic system. It does not replace professional medical advice, diagnosis, or treatment.
 
-This is powerful because many people do not know what information is useful before contacting a doctor. 60 Second Care helps bridge that gap.
+If emergency red flags are detected, the app prioritizes urgent safety guidance instead of continuing with normal AI analysis.
 
-❤️ Why This Matters To Me
+Users should contact emergency services or a qualified healthcare professional when symptoms are severe, worsening, unusual, or concerning.
 
-Healthcare is one of the areas where technology can have a huge human impact.
+## Conclusion
 
-I also showed 60 Second Care to my doctor, Hudson, and he genuinely liked the idea and the direction of the project. He mentioned that he has even seen some patients cancel appointments after using AI tools for guidance. However, he also pointed out that most AI healthcare experiences today are not well organised or structured, which can make them confusing or unreliable for users.
-
-That conversation reinforced my belief that healthcare AI needs better structure, stronger safety layers, and clearer guidance for everyday people. I care about this because everyone deserves clearer access to health information, especially when they feel worried, uncertain, or ignored.
-
-I want 60 Second Care to become available to everyone, regardless of background, location, or confidence with healthcare systems.
-
-For me, the goal is not to replace healthcare professionals. The goal is to support people before they reach that point. I see this as the first layer of healthcare: a quick, accessible, structured check that helps people understand whether they can self-care, monitor, test, contact a doctor, or seek urgent help.
-
-I believe 60 Second Care does this very well for an MVP. It collects useful information quickly, focuses the user through the 3D body model, checks for danger signs, and gives practical next steps.
-
-🚀 MVP And Future Vision
-
-This is only the first version.
-
-The current MVP proves the core idea, but future improvements could include:
-
-more accurate 3D anatomical selection
-live public-health and viral outbreak data
-more advanced symptom pathways
-integration with pharmacies and testing providers
-multilingual support
-accessibility improvements
-clinician-reviewed safety rules
-stronger privacy and data controls
-personalized follow-up after test results
-
-My long-term vision is to make 60 Second Care a trusted first step for everyday health concerns. A tool that helps people feel less lost, collect better information, and take the right action sooner.
-
-✅Conclusion
-
-60 Second Care was created from a real frustration with healthcare access, but also from a strong belief that technology can improve the first step of care.
+60 Second Care was created from a real frustration with healthcare access and a belief that technology can improve the first step of care.
 
 It is not a doctor. It is not a diagnosis engine. It is a first layer.
 
 It helps people pause, describe what is happening, collect better information, check for danger signs, and take action.
 
-That is what I believe the future of accessible healthcare should feel like: fast, clear, careful, and available to everyone.
+That is what accessible healthcare should feel like: fast, clear, careful, and available to everyone.
